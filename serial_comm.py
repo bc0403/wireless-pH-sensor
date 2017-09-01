@@ -1,3 +1,4 @@
+# === custom module for serial ports communication ===
 import serial
 from serial.tools import list_ports
 
@@ -22,5 +23,5 @@ class delayedSerial(serial.Serial):
     def write(self, data):
         for i in data:
             serial.Serial.write(self, i)
-            # the unit is sec, so this statement delay 1 ms after wrinting every char
+            # the unit is sec, so this statement delay 1 ms after writing every char
             time.sleep(.001)

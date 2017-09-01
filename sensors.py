@@ -6,7 +6,7 @@
 "based on PyQt5, Matplotlib, Arduino, and Sensors"
 
 author: Hao Jin
-last edited: May 25, 2017
+last edited: Sept. 1, 2017
 """
 
 # === system modules ===
@@ -30,10 +30,11 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QMenu, QGridLayout,
 from PyQt5.QtGui import (QIcon, QColor, QFont)
 from PyQt5.QtCore import (QCoreApplication, Qt, QTimer)
 
-# === custom modules ===
+# === custom module ===
 import serial_comm as comm
 
-#=== define classes ===
+# === define classes ===
+# basic canvas for matplotlib figure
 class MyMplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
 
@@ -55,7 +56,7 @@ class MyMplCanvas(FigureCanvas):
     def compute_initial_figure(self):
         pass
 
-
+# static figure
 class MyStaticMplCanvas(MyMplCanvas):
     """Simple canvas with a sine plot."""
 
@@ -64,7 +65,7 @@ class MyStaticMplCanvas(MyMplCanvas):
         s = sin(2*pi*t)
         self.axes.plot(t, s)
 
-
+# dynamic figure
 class MyDynamicMplCanvas(MyMplCanvas):
     """A canvas that updates itself every second with a new plot."""
 
@@ -84,7 +85,7 @@ class MyDynamicMplCanvas(MyMplCanvas):
         self.axes.plot([0, 1, 2, 3], l, 'r')
         self.draw()
 
-
+# dynamic figure for pH plot
 class PHMplCanvas(MyMplCanvas):
     """A canvas that updates itself every second with a new plot."""
 
@@ -102,7 +103,7 @@ class PHMplCanvas(MyMplCanvas):
     def update_figure(self):
         pass
 
-
+# dynamic figure for temperature plot
 class TempMplCanvas(MyMplCanvas):
     """A canvas that updates itself every second with a new plot."""
 
@@ -120,7 +121,7 @@ class TempMplCanvas(MyMplCanvas):
     def update_figure(self):
         pass
 
-
+# main window
 class ApplicationWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
@@ -151,6 +152,10 @@ class ApplicationWindow(QMainWindow):
         # === layout ===
         self.main_widget = QWidget(self)
 
+        # QVBoxLayout() lines up widgets vertically
+        # QHBoxLayout() lines up widgets horizontally
+        # QGridLayout() lays out widgets in a grid
+        # vbox includes hbox1, hbox2, grid, hbox3, and hbox4 from top to bottom
         vbox = QVBoxLayout(self.main_widget)
 
         #sc = MyStaticMplCanvas(self.main_widget, width=5, height=4, dpi=100)
@@ -159,10 +164,12 @@ class ApplicationWindow(QMainWindow):
         self.ph_plot = PHMplCanvas(self.main_widget, width=7, height=3, dpi=100)
         self.temp_plot = TempMplCanvas(self.main_widget, width=7, height=3, dpi=100)
 
+        # hbox1 is the full temporal plot of pH value
         hbox1 = QHBoxLayout()
         hbox1.addWidget(self.ph_full_plot)
         # hbox1.addStretch(1)
 
+        # hbox2 includes the latest 10 s plot of pH and temperature, respectively
         hbox2 = QHBoxLayout()
         hbox2.addWidget(self.ph_plot)
         hbox2.addWidget(self.temp_plot)
@@ -171,11 +178,13 @@ class ApplicationWindow(QMainWindow):
         ph_label = QLabel('pH Value: ')
         temp_label = QLabel('Temperature, ℃: ')
 
+        # set bold font to labels
         myFont=QFont()
         myFont.setBold(True)
         ph_label.setFont(myFont)
         temp_label.setFont(myFont)
 
+        # displays a number with LCD-like digits
         self.ph_lcd = QLCDNumber(self)
         self.temp_lcd = QLCDNumber(self)
 
@@ -220,6 +229,7 @@ class ApplicationWindow(QMainWindow):
         connect_button.clicked.connect(self.connectButton)
         disconnect_button.clicked.connect(self.disconnectButton)
 
+        # hbox3 includes serial ports display and operation
         hbox3 = QHBoxLayout()
         hbox3.addWidget(serial_label)
         hbox3.addWidget(self.serial_combobox)
@@ -248,6 +258,7 @@ class ApplicationWindow(QMainWindow):
         ph10_cal_button = QPushButton("pH 10 calibration")
         ph10_cal_button.clicked.connect(self.ph10CalButton)
 
+        # hbox4 includes pH calibration buttons and displays
         hbox4 = QHBoxLayout()
         hbox4.addWidget(self.cal_label1)
         hbox4.addWidget(ph7_cal_button)
@@ -290,9 +301,9 @@ class ApplicationWindow(QMainWindow):
         try:
             with open(self.json_file) as f_obj:
                 self.ph_cal_dict = json.load(f_obj)
-        except FileNotFoundError:
+        except FileNotFoundError: # create a .json file if it does not exist
             self.ph_cal_dict = {
-                'Equations' : 'E = k1*T - k2*T*(pH - pH7)',
+                'Equations' : 'E = k1*T - k2*T*(pH - pH7)', # calibration equation
                 'ph7_cal' : 0,    # mV, k1*T
                 'ph4_cal' : 180,    # mV, k1*T + k2a*T*3, k2a means k2 in acid
                 'ph10_cal' : -180,    # mV, k1*T - k2b*T*3, k2b means k2 in alkaline
@@ -303,18 +314,22 @@ class ApplicationWindow(QMainWindow):
 
 
     def ph7CalButton(self):
+        # save the current voltage as the calibrated value of pH 7
         self.ph_cal_dict['ph7_cal'] = round(np.mean(self.ph_plot.y),2)
+        # save the current temperature for calibration, in Kelvin
         self.ph_cal_dict['T'] = round(np.mean(self.temp_plot.y),2) + 273.15
 
 
     def ph4CalButton(self):
+        # save the current voltage as the calibrated value of pH 4
         self.ph_cal_dict['ph4_cal'] = round(np.mean(self.ph_plot.y),2)
 
 
     def ph10CalButton(self):
+        # save the current voltage as the calibrated value of pH 10
         self.ph_cal_dict['ph10_cal'] = round(np.mean(self.ph_plot.y),2)
 
-
+    # evaluate the current pH value
     def evalPH(self):
         ph7_cal = self.ph_cal_dict['ph7_cal']
         ph4_cal = self.ph_cal_dict['ph4_cal']
@@ -333,10 +348,13 @@ class ApplicationWindow(QMainWindow):
         else:
             return pH
 
-
+    # update the figures and diaplays
     def updateFigs(self):
-        line = self.ser.readline()
-        self.data = [float(val) for val in line.split()]
+        line = self.ser.readline() # read data from serial port, one line at a time
+        self.data = [float(val) for val in line.split()] # split data to float numbers
+        # the data read from the serial port should be 4 float numbers, otherwise neglect it.
+        # the 4 float numbers are temperaure, humidity, voltage at reference electrode,
+        # and voltage at pH electrode, respectively.
         if(len(self.data) == 4):
             self.temp_lcd.display(self.data[0])
             self.temp_plot.y = np.append(self.temp_plot.y, float(self.data[0]))
@@ -345,6 +363,8 @@ class ApplicationWindow(QMainWindow):
             self.temp_plot.axes.set_ylim(min(self.temp_plot.y)-1, max(self.temp_plot.y)+1)
             self.temp_plot.draw()
 
+            # the galvanic voltage of a pH probe is the voltage difference between the
+            # pH electrode (self.data[3]) and reference electrode (self.data[2]).
             self.data_pH = self.evalPH()
             self.ph_lcd.display(self.data_pH)
             self.ph_plot.y = np.append(self.ph_plot.y, float(self.data[3]-self.data[2]))
@@ -370,6 +390,7 @@ class ApplicationWindow(QMainWindow):
                 str(round((self.ph_cal_dict['ph7_cal'] - self.ph_cal_dict['ph10_cal'])/3, 1)) +
                 ", mV/pH")
 
+            # save measured data to file
             with open(self.filename, 'a') as file_object:
                 file_object.write(str(self.data[0]) + "    " +
                     str(self.data[1]) + "    " +
@@ -380,6 +401,7 @@ class ApplicationWindow(QMainWindow):
 
 
     def fileQuit(self):
+        # save the calibration data to .json file
         with open(self.json_file, 'w') as f_obj:
             json.dump(self.ph_cal_dict, f_obj, indent=4)
         self.close()
@@ -416,6 +438,8 @@ Date: 2017.05.25
         for i in self.serial_devices.ports:
             self.serial_combobox.addItem(i)
 
+    # connect to the selected serial port
+    # Bluetooth is a serial port as well as the USB port
     def connectButton(self):
         """connect to serial port"""
         self.ser = comm.serial.Serial(self.serial_combobox.currentText(), baudrate=9600, timeout=1)
@@ -423,6 +447,7 @@ Date: 2017.05.25
         self.timer1.start(1000)
         self.statusBar().showMessage("Connected.   " + self.ser.name)
         self.time_stamp = time.strftime("%Y%m%d_%H_%M_%S",time.localtime(time.time()))
+        # create a file to store the measured data
         self.filename = "data_" + self.time_stamp + ".txt"
         self.filename = os.path.join(self.dataDir, self.filename)
         with open(self.filename, 'w') as file_object:
